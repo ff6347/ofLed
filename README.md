@@ -1,4 +1,5 @@
 
+* addon -> https://github.com/davydka/ofxTeensyOcto
 * for new app: cd ~/Sites/of/apps/work/; projectGenerator -d newApp
 * nodemon -w src -x "make && make run" -e ".cpp"
 * wmctrl -r "app" -b add,above;
