@@ -1,194 +1,334 @@
-// =============================================================================
-//
-// Copyright (c) 2014-2016 Christopher Baker <http://christopherbaker.net>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-//
-// =============================================================================
-
-
 #include "ofApp.h"
 
+//--------------------------------------------------------------
+void ofApp::setup() {
+    ofBackground(0, 0, 0);                      // default background to black / LEDs off
+    ofDisableAntiAliasing();                    // we need our graphics sharp for the LEDs
+    ofSetVerticalSync(false);
+    ofSetFrameRate(90);
+    
+    // SYSTEM SETTINGS
+    //--------------------------------------
+    stripWidth = 300;                            // pixel width of strip
+    stripHeight = 1;                            // pixel height of strip
+    stripsPerPort = 8;                          // total number of strips per port
+    numPorts = 1;                               // total number of teensy ports?
+    brightness = 200;                             // LED brightness
 
-void ofApp::setup()
-{
-    // 1. Upload the PacketSerialReverseEcho.ino sketch (in this example's
-    //    Arduino/ folder) to an Arduino board.  This sketch requires
-    //    the Arduino PacketSerial library https://github.com/bakercp/PacketSerial.
-    // 2. Check the "listDevices" call below to make sure the correct serial
-    //    device is connected.
-    // 3. Run this app.
+    drawModes = 0;                              // default is demo mode
+    demoModes = 0;                              // default is draw white
 
-    ofEnableAlphaBlending();
+    dir = 1;
+    
+    // setup our teensys
+    teensy.setup(stripWidth, stripHeight, stripsPerPort, numPorts);
+    
+    /* Configure our teensy boards (portName, xOffset, yOffset, width%, height%, direction) */
+    teensy.serialConfigure("cu.usbmodem2809741", 0, 0, 100, 100, 0);
+//    teensy.serialConfigure("ttyACM1", 0, 50, 100, 50, 0);
 
-
-
-
-
-
-
-	ofSetWindowShape(12, 12);
-	ofSetWindowPosition(0, 0);
-	ofSetWindowTitle("app");
-
-	ofSetFrameRate(60);
-	ofSetVerticalSync(true);
-
-
-
-
-
-
-
-    std::vector<ofx::IO::SerialDeviceInfo> devicesInfo = ofx::IO::SerialDeviceUtils::listDevices();
-
-    ofLogNotice("ofApp::setup") << "Connected Devices: ";
-
-    for (std::size_t i = 0; i < devicesInfo.size(); ++i)
-    {
-        ofLogNotice("ofApp::setup") << "\t" << devicesInfo[i];
-    }
-
-    if (!devicesInfo.empty())
-    {
-        // Connect to the first matching device.
-        bool success = device.setup(devicesInfo[0], 115200);
-
-        if(success)
-        {
-            device.registerAllEvents(this);
-            ofLogNotice("ofApp::setup") << "Successfully setup " << devicesInfo[0];
-        }
-        else
-        {
-            ofLogNotice("ofApp::setup") << "Unable to setup " << devicesInfo[0];
-        }
-    }
-    else
-    {
-        ofLogNotice("ofApp::setup") << "No devices connected.";
-    }
+    
+    // allocate our pixels, fbo, and texture
+    fbo.allocate(stripWidth, stripHeight*stripsPerPort*numPorts, GL_RGB);
+    
+    setupMedia();
 }
 
 void ofApp::exit()
 {
-    device.unregisterAllEvents(this);
+    /* turn all leds to black */
+    fbo.begin();
+    ofClear(0,0,0);
+    fbo.end();
+    fbo.readToPixels(teensy.pixels1);
+    teensy.update();
+
 }
 
-
+//--------------------------------------------------------------
 void ofApp::update()
 {
-	try {
+    //ofSetWindowTitle("TeensyOctoExample - "+ofToString(ofGetFrameRate()));
+    ballpos+=dir*1.0f;
 
-		auto iter = serialMessages.begin();
-		while (iter != serialMessages.end()){
-			ofLogNotice() << ofToString(iter->message);
-			serialMessages.erase(iter);
+    if (dirVid.size() > 0)
+    {
+        if (videoOn) vid[currentVideo].update();                  // update video when enabled
+    }
 
-			if (!iter->exception.empty()){
-				ofLogError() << ofToString(iter->exception);
-			}
-		}
+    updateFbo();                                // update our Fbo functions
+    teensy.update();                            // update our serial to teensy stuff
 
-
-		// Create a byte buffer.
-		ofx::IO::ByteBuffer buffer("Frame Number: " + ofToString(ofGetFrameNum()));
-
-		// Send the byte buffer.
-		// ofx::IO::PacketSerialDevice will encode the buffer, send it to the
-		// receiver, and send a packet marker.
-		device.send(buffer);
-	} catch(const std::exception& exc) {
-		ofLogError("ofApp::update") << exc.what();
-	}
 }
 
+//--------------------------------------------------------------
+void ofApp::updateFbo()
+{    
+    fbo.begin();                                // begins the fbo
+    ofClear(0,0,0);                             // refreshes fbo, removes artifacts
+    
+    ofPushStyle();
+    switch (drawModes)
+    {
+        case 0:            
+            drawPong();
+            break;
+        case 1:
+            drawVideos();
+            break;
+        case 2:
+            drawImages();
+            break;
+        case 3:
+            drawDemos();
+        break;
+        default:
+            break;
+    }
+    ofPopStyle();
+    
+    fbo.end();                                  // closes the fbo
+    
+    fbo.readToPixels(teensy.pixels1);           // send fbo pixels to teensy
 
+}
+
+//--------------------------------------------------------------
 void ofApp::draw()
 {
-
-	ofColor colorOne(ofMap(sin(ofGetElapsedTimef()), -1, 1, 1, 124), 0, 0);
-	ofColor colorTwo(0, 0, ofMap(sin(ofGetElapsedTimef()), -1, 1, 124, 1));
-
-	ofBackgroundGradient(colorOne, colorTwo, OF_GRADIENT_LINEAR);
-
-	/*
-    ofBackground(0);
+    teensy.draw(20,300);
 
     ofSetColor(255);
+    ofDrawBitmapString("// Controls //", ofGetWidth()-250, 20);
+    ofDrawBitmapString("Brightness (up/down) == " + ofToString(brightness), ofGetWidth()-250, 80);
+    ofDrawBitmapString("Videos # == " + ofToString(dirVid.size()), ofGetWidth()-250, 120);
+    ofDrawBitmapString("Images # == " + ofToString(dirImg.size()), ofGetWidth()-250, 140);
+}
 
-    std::stringstream ss;
+void ofApp::drawPong()
+{
+    if(ballpos > 290) {
+        ballpos = 290;
+        dir = -1;
+    }
+    else if(ballpos < 0) {
+        ballpos = 0;
+        dir = 1;
+    }
+    ofDrawRectangle(ballpos,0,10,stripHeight*stripsPerPort*numPorts);
 
-    ss << "         FPS: " << ofGetFrameRate() << std::endl;
-    ss << "Connected to: " << device.getPortName();
+}
 
-    ofDrawBitmapString(ss.str(), ofVec2f(20, 20));
+void ofApp::drawDemos()
+{
+    switch (demoModes) {
+        case 0:
+            teensy.drawTestPattern();
+            break;
+        case 1:
+            teensy.drawWhite();
+            break;
+        case 2:
+            teensy.drawRainbowH();
+            break;
+        case 3:
+            teensy.drawRainbowV();
+            break;
+        case 4:
+            teensy.drawWaves();
+            break;
+            
+        default:
+            break;
+    }
+}
 
-    int x = 20;
-    int y = 50;
-    int height = 20;
-
-    auto iter = serialMessages.begin();
-
-    while (iter != serialMessages.end())
-    {
-        iter->fade -= 20;
-        
-        if (iter->fade < 0)
-        {
-            iter = serialMessages.erase(iter);
+//--------------------------------------------------------------
+void ofApp::enableVideo()
+{
+    if (dirVid.size() > 0) {
+        if (!videoOn) videoOn = true;           // enables video
+        if (vid[currentVideo].isLoaded() == false) {
+            vid[currentVideo].load(dirVid.getPath(currentVideo));
+            vid[currentVideo].play();           // plays the video
         }
-        else
-        {
-            ofSetColor(255, ofClamp(iter->fade, 0, 255));
-            ofDrawBitmapString(iter->message, ofVec2f(x, y));
-
-            y += height;
-
-            if (!iter->exception.empty())
-            {
-                ofSetColor(255, 0, 0, ofClamp(iter->fade, 0, 255));
-                ofDrawBitmapString(iter->exception, ofVec2f(x + height, y));
-                y += height;
+        else {
+            if (vid[currentVideo].isPlaying()) {
+                vid[currentVideo].stop();       // stops/pauses the video
             }
-
-            ++iter;
+            else {
+                vid[currentVideo].play();       // plays the video
+            }
         }
     }
-	*/
 }
 
-
-void ofApp::onSerialBuffer(const ofx::IO::SerialBufferEventArgs& args)
+//--------------------------------------------------------------
+void ofApp::disableVideo()
 {
-    // Decoded serial packets will show up here.
-    SerialMessage message(args.getBuffer().toString(), "", 255);
-    serialMessages.push_back(message);
+    if (dirVid.size() > 0) {
+        videoOn = false;                        // disables video
+        if (vid[currentVideo].isPlaying()) vid[currentVideo].stop();  // stops/pauses the video
+    }
 }
 
-
-void ofApp::onSerialError(const ofx::IO::SerialBufferErrorEventArgs& args)
+//--------------------------------------------------------------
+void ofApp::drawVideos()
 {
-    // Errors and their corresponding buffer (if any) will show up here.
-    SerialMessage message(args.getBuffer().toString(),
-                          args.getException().displayText(),
-                          500);
-
-    serialMessages.push_back(message);
+    //Play videos
+    if (dirVid.size() > 0){
+        ofSetColor(brightness);
+        vid[currentVideo].setSpeed(5.0f);
+        vid[currentVideo].draw(0, 0, stripWidth, stripHeight*stripsPerPort*numPorts);
+    }
 }
+
+//--------------------------------------------------------------
+void ofApp::drawImages()
+{
+    if (dirImg.size() > 0) {
+        ofSetColor(brightness);
+        img[currentImage].draw(0, 0, stripWidth, stripHeight*stripsPerPort*numPorts);
+    }
+}
+
+//--------------------------------------------------------------
+void ofApp::keyPressed(int key){
+    
+    switch (key)
+    {
+        //-----------------------------------------------
+        case OF_KEY_UP:
+            brightness += 2;
+            if (brightness > 255) brightness = 255;
+            teensy.setBrightness(brightness);
+            break;
+            
+        case OF_KEY_DOWN:
+            brightness -= 2;
+            if (brightness < 0) brightness = 0;
+            teensy.setBrightness(brightness);
+            break;
+
+        case 'v':
+            drawModes = 1;                          // video mode
+            enableVideo();
+            break;
+
+        case 'i':
+            drawModes = 2;                          // image mode
+            disableVideo();
+
+            img[currentImage].load(dirImg.getPath(currentImage));
+            break;
+        
+        case '=':
+            if (drawModes == 1) {
+                vid[currentVideo].stop();
+            }
+            
+            if (drawModes == 2) {
+                currentImage++;
+                if (currentImage > dirImg.size()-1) currentImage = 0;
+                img[currentImage].load(dirImg.getPath(currentImage));
+            }
+            break;
+            
+        case '-':
+            if (drawModes == 1) {
+                vid[currentVideo].stop();
+            }
+            
+            if (drawModes == 2) {
+                currentImage--;
+                if (currentImage < 0) currentImage = dirImg.size()-1;
+                img[currentImage].load(dirImg.getPath(currentImage));
+            }
+            break;
+            
+        case 'd':
+            disableVideo();
+            
+            demoModes++;
+            if (drawModes != 3) drawModes = 3;      // switch the draw mode to display demo mode.
+            if (demoModes > 4) demoModes = 0;       // tap through the demo modes on each press.
+            break;
+
+        case 't':
+            disableVideo();
+
+            if (drawModes != 0) drawModes = 0;      // switch the draw mode
+            break;
+    }
+
+}
+
+//--------------------------------------------------------------
+void ofApp::keyReleased(int key)
+{
+    switch (key) {
+        case '=':
+            if (drawModes == 1)
+            {
+                currentVideo++;
+                if (currentVideo > dirVid.size()-1) currentVideo = 0;
+                vid[currentVideo].load(dirVid.getPath(currentVideo));
+                vid[currentVideo].play();
+            }                       // restart video at first frame
+            break;
+            
+        case '-':
+            if (drawModes == 1) {
+                currentVideo--;
+                if (currentVideo < 0) currentVideo = dirVid.size()-1;
+                vid[currentVideo].load(dirVid.getPath(currentVideo));
+                vid[currentVideo].play();
+            }
+            break;
+            
+        default:
+            break;
+    }
+}
+
+//--------------------------------------------------------------
+void ofApp::setupMedia()
+{
+    dirVid.listDir("videos/");
+    dirVid.sort();
+    //allocate the vector to have as many ofVidePlayer as files
+    if( dirVid.size() ){
+        vid.assign(dirVid.size(), ofVideoPlayer());
+    }
+    videoOn = false;
+    currentVideo = 0;
+
+    dirImg.listDir("images/");
+    dirImg.sort();
+    //allocate the vector to have as many ofImages as files
+    if( dirImg.size() ){
+        img.assign(dirImg.size(), ofImage());
+    }
+    currentImage = 0;
+}
+
+//--------------------------------------------------------------
+void ofApp::mouseMoved(int x, int y ){}
+
+//--------------------------------------------------------------
+void ofApp::mouseDragged(int x, int y, int button){}
+
+//--------------------------------------------------------------
+void ofApp::mousePressed(int x, int y, int button){}
+
+//--------------------------------------------------------------
+void ofApp::mouseReleased(int x, int y, int button){}
+
+//--------------------------------------------------------------
+void ofApp::windowResized(int w, int h){}
+
+//--------------------------------------------------------------
+void ofApp::gotMessage(ofMessage msg){}
+
+//--------------------------------------------------------------
+void ofApp::dragEvent(ofDragInfo dragInfo){}
