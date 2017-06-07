@@ -9,14 +9,15 @@ void ofApp::setup() {
 
 	// SYSTEM SETTINGS
 	//--------------------------------------
-	stripWidth = 144;                            // pixel width of strip
-	stripHeight = 1;                            // pixel height of strip
-	stripsPerPort = 8;                          // total number of strips per port
+	stripWidth = 12;                            // pixel width of strip
+	stripHeight = 96;                            // pixel height of strip
+	stripsPerPort = 1;                          // total number of strips per port
 	numPorts = 1;                               // total number of teensy ports?
 	brightness = 20;                             // LED brightness
 
 	drawModes = 0;                              // default mode
 
+	rectWidth = 1;
 	dir = 1;
 
 	// setup our teensys
@@ -92,8 +93,8 @@ void ofApp::draw(){
 }
 
 void ofApp::drawPong(){
-	if(ballpos > 134) {
-		ballpos = 134;
+	if(ballpos > stripWidth-rectWidth) {
+		ballpos = stripWidth-rectWidth;
 		dir = -1;
 	}
 	else if(ballpos < 0) {
@@ -102,7 +103,7 @@ void ofApp::drawPong(){
 	}
 	ofSetColor(255, 0, 255);
 	//ofSetColor(brightness);
-	ofDrawRectangle(ballpos,0,10,stripHeight*stripsPerPort*numPorts);
+	ofDrawRectangle(ballpos,0,rectWidth,stripHeight*stripsPerPort*numPorts);
 }
 
 //--------------------------------------------------------------

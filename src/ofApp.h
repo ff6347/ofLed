@@ -55,6 +55,7 @@ class ofApp : public ofBaseApp{
     void drawImages();
     int drawModes;
     int demoModes;
+    int rectWidth;
     float ballpos;
     int dir;
 
