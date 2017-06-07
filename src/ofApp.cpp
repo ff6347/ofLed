@@ -15,8 +15,7 @@ void ofApp::setup() {
 	numPorts = 1;                               // total number of teensy ports?
 	brightness = 20;                             // LED brightness
 
-	drawModes = 0;                              // default is demo mode
-	demoModes = 0;                              // default is draw white
+	drawModes = 0;                              // default mode
 
 	dir = 1;
 
@@ -61,6 +60,7 @@ void ofApp::updateFbo(){
 	ofClear(0,0,0);                             // refreshes fbo, removes artifacts
 
 	//ofSetColor(brightness);
+	ofSetColor(255);
 
 	ofPushStyle();
 	switch (drawModes)
@@ -100,13 +100,14 @@ void ofApp::drawPong(){
 		ballpos = 0;
 		dir = 1;
 	}
+	ofSetColor(255, 0, 255);
+	//ofSetColor(brightness);
 	ofDrawRectangle(ballpos,0,10,stripHeight*stripsPerPort*numPorts);
 }
 
 //--------------------------------------------------------------
 void ofApp::drawImages(){
 	if (dirImg.size() > 0) {
-		ofSetColor(brightness);
 		img[currentImage].draw(0, 0, stripWidth, stripHeight*stripsPerPort*numPorts);
 	}
 }
