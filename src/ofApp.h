@@ -31,6 +31,7 @@ class ofApp : public ofBaseApp{
     ofxTeensyOcto teensy;
     int stripWidth;
     int stripHeight;
+    int rowHeight;
     int stripsPerPort;
     int numPorts;
     int brightness;

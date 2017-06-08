@@ -11,9 +11,11 @@ void ofApp::setup() {
 	//--------------------------------------
 	stripWidth = 12;                            // pixel width of strip
 	stripHeight = 96;                            // pixel height of strip
+	rowHeight = 12;
 	stripsPerPort = 1;                          // total number of strips per port
 	numPorts = 1;                               // total number of teensy ports?
 	brightness = 20;                             // LED brightness
+
 
 	drawModes = 0;                              // default mode
 
@@ -21,11 +23,11 @@ void ofApp::setup() {
 	dir = 1;
 
 	// setup our teensys
-	teensy.setup(stripWidth, stripHeight, stripsPerPort, numPorts);
+	teensy.setup(stripWidth, stripHeight, rowHeight, stripsPerPort, numPorts);
 
 	/* Configure our teensy boards (portName, xOffset, yOffset, width%, height%, direction) */
-	teensy.serialConfigure("cu.usbmodem2809741", 0, 0, 100, 100, 0);
-	//    teensy.serialConfigure("ttyACM1", 0, 50, 100, 50, 0);
+	//teensy.serialConfigure("cu.usbmodem2809741", 0, 0, 100, 100, 0);
+	teensy.serialConfigure("cu.usbmodem2733511", 0, 0, 100, 100, 0);
 	teensy.setBrightness(brightness);
 
 
@@ -109,7 +111,8 @@ void ofApp::drawPong(){
 //--------------------------------------------------------------
 void ofApp::drawImages(){
 	if (dirImg.size() > 0) {
-		img[currentImage].draw(0, 0, stripWidth, stripHeight*stripsPerPort*numPorts);
+		//img[currentImage].draw(0, 0, stripWidth, stripHeight*stripsPerPort*numPorts);
+		img[currentImage].draw(0, 0, stripWidth, rowHeight);
 	}
 }
 
