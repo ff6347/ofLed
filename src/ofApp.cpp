@@ -9,9 +9,9 @@ void ofApp::setup() {
 
 	// SYSTEM SETTINGS
 	//--------------------------------------
-	stripWidth = 12;                            // pixel width of strip
-	stripHeight = 96;                            // pixel height of strip
-	rowHeight = 12;
+	stripWidth = 16;                            // pixel width of strip
+	stripHeight = 128;                            // pixel height of strip
+	rowHeight = 16;
 	stripsPerPort = 1;                          // total number of strips per port
 	numPorts = 1;                               // total number of teensy ports?
 	brightness = 20;                             // LED brightness
